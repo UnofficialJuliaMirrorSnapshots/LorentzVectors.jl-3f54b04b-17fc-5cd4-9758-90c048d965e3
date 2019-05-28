@@ -5,11 +5,11 @@ module LorentzVectors
 import LinearAlgebra: dot, ⋅, cross, ×, norm, normalize
 import Random: rand, MersenneTwister
 
-import Base: +, -, *, /, ==, ≈, zero
+import Base: +, -, *, /, ==, isapprox, ≈, zero
 
 export LorentzVector, SpatialVector, Vec4, Vec3
-export +, -, *, /, ==, ≈, dot, ⋅, cross, ×, norm, normalize, rand, zero
-export boost
+export +, -, *, /, ==, isapprox, ≈, dot, ⋅, cross, ×, norm, normalize, rand, zero
+export boost, rotate
 
 """
     LorentzVector(t, x, y, z)
@@ -158,12 +158,15 @@ function ==(u::SpatialVector, v::SpatialVector)
     u.x == v.x && u.y == v.y && u.z == v.z
 end
 
-function ≈(u::LorentzVector, v::LorentzVector)
-    u.t ≈ v.t && u.x ≈ v.x && u.y ≈ v.y && u.z ≈ v.z
+function isapprox(u::LorentzVector, v::LorentzVector; kwargs...)
+    isapprox(u.t, v.t; kwargs...) && isapprox(Vec3(u), Vec3(v); kwargs...)
 end
 
-function ≈(u::SpatialVector, v::SpatialVector)
-    u.x ≈ v.x && u.y ≈ v.y && u.z ≈ v.z
+function isapprox(u::SpatialVector, v::SpatialVector;
+                  atol::Real=0,
+                  rtol::Real=atol>0 ? 0 : √min(eps(typeof(u.x)), eps(typeof(v.x))))
+    err = norm(u-v)
+    err <= max(atol, rtol*max(norm(u), norm(v)))
 end
 
 """
@@ -230,6 +233,17 @@ function boost(u::LorentzVector, β::SpatialVector)
     t_new = γ * (u.t - β⋅x_old)
     x_new = x_old + ((γ-one(γ)) * (x_old⋅β) / (β⋅β) - γ*u.t) * β
     LorentzVector(t_new, x_new.x, x_new.y, x_new.z)
+end
+
+"""
+Rotate a vector v by an angle θ around the unit vector k̂, using Rodrigues' rotation formula.
+
+Note: k̂ *must* be normalized, otherwise this method will return the wrong result.
+
+Source: https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+"""
+function rotate(v::SpatialVector, k̂::SpatialVector, θ::Real)
+    v*cos(θ) + (k̂×v)*sin(θ) + k̂*(k̂⋅v)*(1-cos(θ))
 end
 
 end # module LorentzVectors
